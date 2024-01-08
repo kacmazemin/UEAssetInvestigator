@@ -1,3 +1,5 @@
+
+
 ## **Unreal Engine 4 Asset Investigator Module**
 
 Overview
@@ -12,10 +14,9 @@ Export asset information to a text file for further analysis or documentation.
 
 ## How to use
 
-*Make sure that you also have the Imgui plugin made by @sunpeng1995 from https://github.com/sunpeng1995/UnrealImGui/tree/editor-use which specifically works with Unreal Engine editor
-*Download UEAssetInvestigator
-*Put them in the Plugin folder
-
+ - Make sure that you also have the Imgui plugin made by @sunpeng1995 from https://github.com/sunpeng1995/UnrealImGui/tree/editor-use which specifically works with Unreal Engine editor
+ - Download UEAssetInvestigator
+ - Put them in the Plugin folder
 
 ***Compatibility 
 UE4 4.27.2***
