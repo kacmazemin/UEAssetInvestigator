@@ -2,7 +2,7 @@
 
 ## **Unreal Engine 4 Asset Investigator Module**
 
-Overview
+
 The Asset Investigator Module is a plugin for Unreal Engine 4 (UE4) that provides a comprehensive set of tools for managing and analyzing assets within the UE4 editor. This module allows users to explore, and inspect assets, aiding in tasks such as identifying memory usage, exploring asset dependencies, and more.
 
 ## Usage
