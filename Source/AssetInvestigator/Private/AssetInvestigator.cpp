@@ -343,7 +343,10 @@ void FAssetInvestigatorModule::GatherSizeRecursively(const FAssetData& AssetData
 			}
 
 			const FAssetPackageData* FoundData = CurrentRegistrySource->RegistryState->GetAssetPackageData(AssetData.PackageName);
-			AssetSizeInfo.DiskSize += FoundData->DiskSize;
+			if (FoundData)
+			{
+				AssetSizeInfo.DiskSize += FoundData->DiskSize;
+			}
 
 			VisitedAssets.Add(AssetData.PackageName);
 
