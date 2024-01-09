@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 #include "ImGuiDelegates.h"
+#include "Misc/AssetRegistryInterface.h"
 
 struct FAssetData;
 struct FAssetInfo;
@@ -57,6 +58,8 @@ private:
 	/** The registry source to display information for */
 	const FAssetManagerEditorRegistrySource* CurrentRegistrySource;
 
+	TArray<UEdGraphNode*> FoundNodes;
+
 	/*
 	 * Initializes the User Interface for the Asset Investigator, including buttons and progress bar.
 	 */
@@ -86,4 +89,9 @@ private:
 	 * Gathers information about the specified asset, including size and dependencies, and adds it to the CachedAssets array.
 	 */
 	void GatherAssetInformation(const FAssetData& AssetData);
+
+
+	void DisplayReferences(intptr_t nodeId, const FString& categoryName, UE::AssetRegistry::EDependencyQuery dependencyQuery);
+
+	void DisplayCastToNodes();
 };

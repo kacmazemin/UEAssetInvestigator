@@ -21,6 +21,9 @@
 #include "ImGuiModule.h"
 #include "ImGuiDelegates.h"
 #include "ImGuiWidgetEd.h"
+#include "Misc/ScopedSlowTask.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+#include "Kismet2/KismetEditorUtilities.h"
 
 void FAssetInvestigatorModule::StartupModule()
 {
@@ -205,13 +208,12 @@ void FAssetInvestigatorModule::InitializeUI(bool* p_open)
 	static ImGuiWindowFlags WindowFlags = ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove;
 	ImGui::BeginChild("Details", ImVec2(ImGui::GetWindowContentRegionWidth() * 0.5f, ImGui::GetWindowHeight()), false, WindowFlags);
 	static ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
-	static int selection_mask = (1 << 2); 
 
 	for (int i = 0; i < CachedAssets.Num(); i++)
 	{
 		// Disable the default open on single-click behavior and pass in Selected flag according to our selection state.
 		ImGuiTreeNodeFlags node_flags = base_flags;
-		const bool is_selected = (selection_mask & (1 << i)) != 0;
+		const bool is_selected = i == node_clicked;
 		if (is_selected)
 		{
 			node_flags |= ImGuiTreeNodeFlags_Selected;
@@ -224,19 +226,7 @@ void FAssetInvestigatorModule::InitializeUI(bool* p_open)
 		if (ImGui::IsItemClicked())
 		{
 			node_clicked = i;
-		}
-	}
-
-	if (node_clicked != -1)
-	{
-		// Update selection state. Process outside of tree loop to avoid visual inconsistencies during the clicking-frame.
-		if (ImGui::GetIO().KeyCtrl)
-		{
-			selection_mask ^= (1 << node_clicked);          // CTRL+click to toggle
-		}
-		else
-		{
-			selection_mask = (1 << node_clicked);           // Click to single-select
+			FoundNodes.Empty();
 		}
 	}
 
@@ -248,43 +238,21 @@ void FAssetInvestigatorModule::InitializeUI(bool* p_open)
 
 	if (node_clicked != -1)
 	{
+		ImGui::Text("Selected Asset %s", TCHAR_TO_ANSI(*CachedAssets[node_clicked].AssetPath.ToString()));
 		ImGui::Text("DiskSize %s", TCHAR_TO_ANSI(*AssetInvestigatorUtility::MakeBestSizeString(CachedAssets[node_clicked].AssetSizeInfo.DiskSize, true)));
 		ImGui::Text("MemorySize %s", TCHAR_TO_ANSI(*AssetInvestigatorUtility::MakeBestSizeString(CachedAssets[node_clicked].AssetSizeInfo.MemorySize, true)));
 
 		CreateUtilityButtons();
+		DisplayReferences(2, "Hard References", UE::AssetRegistry::EDependencyQuery::Hard);
+		DisplayReferences(3, "Soft References", UE::AssetRegistry::EDependencyQuery::Soft);
 
-		//todo: create a generic function
-		if (ImGui::TreeNode((void*)(intptr_t)2, "Hard References"))
+		if (ImGui::SmallButton("Bring <CastTo> Nodes"))
 		{
-			TArray<FName> HardReferences;
-			IAssetRegistry::Get()->GetDependencies(CachedAssets[node_clicked].PackagePath, HardReferences, UE::AssetRegistry::EDependencyCategory::All, UE::AssetRegistry::EDependencyQuery::Hard);
-
-			for (int n = 0; n < HardReferences.Num(); n++)
-			{
-				char label[256];
-				sprintf(label, "%s", TCHAR_TO_ANSI(*HardReferences[n].ToString()));
-				if (ImGui::Selectable(label)) {}
-				ImGui::NextColumn();
-			}
-
-			ImGui::TreePop();
+			FoundNodes = AssetInvestigatorUtility::GetDynamicCastToNodes(CachedAssets[node_clicked].AssetPath);
 		}
 
-		if (ImGui::TreeNode((void*)(intptr_t)3, "Soft References"))
-		{
-			TArray<FName> SoftReferences;
-			IAssetRegistry::Get()->GetDependencies(CachedAssets[node_clicked].PackagePath, SoftReferences, UE::AssetRegistry::EDependencyCategory::All, UE::AssetRegistry::EDependencyQuery::Soft);
-
-			for (int n = 0; n < SoftReferences.Num(); n++)
-			{
-				char label[256];
-				sprintf(label, "%s", TCHAR_TO_ANSI(*SoftReferences[n].ToString()));
-				if (ImGui::Selectable(label)) {}
-				ImGui::NextColumn();
-			}
-
-			ImGui::TreePop();
-		}
+		ImGui::NewLine();
+		DisplayCastToNodes();
 	}
 
 	ImGui::EndChild();
@@ -366,6 +334,56 @@ void FAssetInvestigatorModule::GatherAssetInformation(const FAssetData& AssetDat
 	GatherSizeRecursively(AssetData, AssetInfo.AssetSizeInfo, VisitedAssets);
 
 	CachedAssets.Add(AssetInfo);
+}
+
+void FAssetInvestigatorModule::DisplayReferences(intptr_t nodeId, const FString& categoryName, UE::AssetRegistry::EDependencyQuery dependencyQuery)
+{
+	if (ImGui::TreeNode((void*)nodeId, TCHAR_TO_ANSI(*categoryName)))
+	{
+		TArray<FName> References;
+		IAssetRegistry::Get()->GetDependencies(CachedAssets[node_clicked].PackagePath, References, UE::AssetRegistry::EDependencyCategory::All, dependencyQuery);
+
+		for (int n = 0; n < References.Num(); n++)
+		{
+			char label[256];
+			sprintf(label, "%s", TCHAR_TO_ANSI(*References[n].ToString()));
+			if (ImGui::Selectable(label)) {}
+			ImGui::NextColumn();
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+void FAssetInvestigatorModule::DisplayCastToNodes()
+{
+	if (FoundNodes.Num() > 0)
+	{
+		for (UEdGraphNode* Node : FoundNodes)
+		{
+			char label[256];
+			sprintf(label, "%s", TCHAR_TO_ANSI(*Node->GetNodeTitle(ENodeTitleType::EditableTitle).ToString()));
+
+			if (ImGui::SmallButton(label))
+			{
+				if (Node)
+				{
+					UBlueprint* Blueprint = FBlueprintEditorUtils::FindBlueprintForGraph(Node->GetGraph());
+					if (Blueprint)
+					{
+						// Open the Blueprint editor
+						FKismetEditorUtilities::BringKismetToFocusAttentionOnObject(Node);
+
+						UE_LOG(LogTemp, Warning, TEXT("Jumped to the desired node in the Blueprint editor."));
+					}
+					else
+					{
+						UE_LOG(LogTemp, Warning, TEXT("Failed to find the Blueprint for the specified graph."));
+					}
+				}
+			}
+		}
+	}
 }
 
 void FAssetInvestigatorModule::PluginButtonClicked()

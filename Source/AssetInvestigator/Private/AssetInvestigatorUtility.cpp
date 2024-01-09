@@ -10,6 +10,9 @@
 #include "Misc/ScopedSlowTask.h"
 #include <string>
 
+#include "K2Node_DynamicCast.h"
+
+
 #define LOCTEXT_NAMESPACE "FAssetInvestigatorModule"
 
 void AssetInvestigatorUtility::OpenSelectedAsset(const FName& AssetPath)
@@ -113,4 +116,37 @@ FString AssetInvestigatorUtility::MakeBestSizeString(const SIZE_T SizeInBytes, c
 	}
 
 	return SizeText.ToString();
+}
+
+TArray<UEdGraphNode*> AssetInvestigatorUtility::GetDynamicCastToNodes(const FName& AssetPath)
+{
+	TArray<UEdGraphNode*> FoundNodes;
+
+	const FAssetData AssetData = IAssetRegistry::Get()->GetAssetByObjectPath(AssetPath);
+
+	if (AssetData.IsValid())
+	{
+		UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.GetAsset());
+
+		if (Blueprint)
+		{
+			// Successfully obtained UBlueprint
+			for (UEdGraph* Graph : Blueprint->UbergraphPages)
+			{
+				// Iterate through all nodes in the graph
+				for (UEdGraphNode* Node : Graph->Nodes)
+				{
+					// Check if the node is of the desired type or has specific properties
+					if (Node->IsA(UK2Node_DynamicCast::StaticClass()))
+					{
+						FoundNodes.Add(Node);
+
+						UE_LOG(LogTemp, Warning, TEXT("Found the desired node!"));
+					}
+				}
+			}
+		}
+	}
+
+	return FoundNodes;
 }

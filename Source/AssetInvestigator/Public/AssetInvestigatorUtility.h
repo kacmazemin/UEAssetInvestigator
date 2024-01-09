@@ -5,7 +5,7 @@
 struct FAssetInfo;
 
 /**
- * Utility class for asset investigation in Unreal Engine 4/5.
+ * Utility class for asset investigation in Unreal Engine 4.
  */
 class ASSETINVESTIGATOR_API AssetInvestigatorUtility
 {
@@ -40,4 +40,6 @@ public:
 	 * @return              A formatted string representing the size.
 	 */
 	static FString MakeBestSizeString(const SIZE_T SizeInBytes, const bool bHasKnownSize);
+
+	static TArray<UEdGraphNode*> GetDynamicCastToNodes(const FName& AssetPath);
 };
